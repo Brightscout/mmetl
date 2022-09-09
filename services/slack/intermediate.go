@@ -357,6 +357,19 @@ func addFileToPost(file *SlackFile, uploads map[string]*zip.File, post *Intermed
 	return nil
 }
 
+func (t *Transformer) CreateIntermediateUser(user string) {
+	newUser := &IntermediateUser{
+		Id:        user,
+		Username:  user,
+		FirstName: "Deleted",
+		LastName:  "User",
+		Email:     fmt.Sprintf("%s@local", user),
+		Password:  model.NewId(),
+	}
+	t.Intermediate.UsersById[user] = newUser
+	t.Logger.Warn("Created new user because original user missing from the import files. user=" + user)
+}
+
 func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir string, skipAttachments, discardInvalidProps bool) error {
 	t.Logger.Info("Transforming posts")
 
@@ -388,8 +401,8 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 				}
 				author := t.Intermediate.UsersById[post.User]
 				if author == nil {
-					t.Logger.Warnf("Unable to add the message as the Slack user does not exist in Mattermost. user=%s", post.User)
-					continue
+					t.CreateIntermediateUser(post.User)
+					author = t.Intermediate.UsersById[post.User]
 				}
 				newPost := &IntermediatePost{
 					User:     author.Username,
@@ -405,6 +418,10 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 						}
 					} else if post.Files != nil {
 						for _, file := range post.Files {
+							if file.Name == "" {
+								t.Logger.Warnf("Not able to access file %s as file access is denied so skipping", file.Id)
+								continue
+							}
 							err := addFileToPost(file, slackExport.Uploads, newPost, attachmentsDir)
 							if err != nil {
 								t.Logger.WithError(err).Error("Failed to add file to post")
@@ -443,8 +460,8 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 				}
 				author := t.Intermediate.UsersById[post.Comment.User]
 				if author == nil {
-					t.Logger.Warnf("Unable to add the message as the Slack user does not exist in Mattermost. user=%s", post.Comment.User)
-					continue
+					t.CreateIntermediateUser(post.User)
+					author = t.Intermediate.UsersById[post.User]
 				}
 				newPost := &IntermediatePost{
 					User:     author.Username,
@@ -478,8 +495,8 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 				}
 				author := t.Intermediate.UsersById[post.User]
 				if author == nil {
-					t.Logger.Warnf("Unable to add the message as the Slack user does not exist in Mattermost. user=%s", post.User)
-					continue
+					t.CreateIntermediateUser(post.User)
+					author = t.Intermediate.UsersById[post.User]
 				}
 
 				newPost := &IntermediatePost{
@@ -500,8 +517,8 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 				}
 				author := t.Intermediate.UsersById[post.User]
 				if author == nil {
-					t.Logger.Warnf("Unable to add the message as the Slack user does not exist in Mattermost. user=%s", post.User)
-					continue
+					t.CreateIntermediateUser(post.User)
+					author = t.Intermediate.UsersById[post.User]
 				}
 
 				newPost := &IntermediatePost{
@@ -522,8 +539,8 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 				}
 				author := t.Intermediate.UsersById[post.User]
 				if author == nil {
-					t.Logger.Warnf("Slack Import: Unable to add the message as the Slack user does not exist in Mattermost. user=%s", post.User)
-					continue
+					t.CreateIntermediateUser(post.User)
+					author = t.Intermediate.UsersById[post.User]
 				}
 
 				newPost := &IntermediatePost{
