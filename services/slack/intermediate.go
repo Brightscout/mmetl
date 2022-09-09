@@ -367,7 +367,7 @@ func (t *Transformer) CreateIntermediateUser(user string) {
 		Password:  model.NewId(),
 	}
 	t.Intermediate.UsersById[user] = newUser
-	t.Logger.Warn("Created new user because original user missing from the import files. user=" + user)
+	t.Logger.Warnf("Created a new user because the original user was missing from the import files. user=%s", user)
 }
 
 func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir string, skipAttachments, discardInvalidProps bool) error {
