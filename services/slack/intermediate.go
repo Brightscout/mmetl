@@ -506,6 +506,42 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 					CreateAt: SlackConvertTimeStamp(post.TimeStamp),
 				}
 
+				if (post.File != nil || post.Files != nil) && !skipAttachments {
+					if post.File != nil {
+						err := addFileToPost(post.File, slackExport.Uploads, newPost, attachmentsDir)
+						if err != nil {
+							t.Logger.WithError(err).Error("Failed to add file to post")
+						}
+					} else if post.Files != nil {
+						for _, file := range post.Files {
+							if file.Name == "" {
+								t.Logger.Warnf("Not able to access file %s as file access is denied so skipping", file.Id)
+								continue
+							}
+							err := addFileToPost(file, slackExport.Uploads, newPost, attachmentsDir)
+							if err != nil {
+								t.Logger.WithError(err).Error("Failed to add file to post")
+							}
+						}
+					}
+				}
+
+				if len(post.Attachments) > 0 {
+					props := model.StringInterface{"attachments": post.Attachments}
+					propsB, _ := json.Marshal(props)
+
+					if utf8.RuneCountInString(string(propsB)) <= model.PostPropsMaxRunes {
+						newPost.Props = props
+					} else {
+						if discardInvalidProps {
+							t.Logger.Warn("Unable import post as props exceed the maximum character count. Skipping as --discard-invalid-props is enabled.")
+							continue
+						} else {
+							t.Logger.Warn("Unable to add props to post as they exceed the maximum character count.")
+						}
+					}
+				}
+
 				AddPostToThreads(post, newPost, threads, channel, timestamps)
 
 			// channel join/leave messages
