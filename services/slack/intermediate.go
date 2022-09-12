@@ -360,7 +360,7 @@ func addFileToPost(file *SlackFile, uploads map[string]*zip.File, post *Intermed
 func (t *Transformer) CreateIntermediateUser(user string) {
 	newUser := &IntermediateUser{
 		Id:        user,
-		Username:  user,
+		Username:  strings.ToLower(user),
 		FirstName: "Deleted",
 		LastName:  "User",
 		Email:     fmt.Sprintf("%s@local", user),
