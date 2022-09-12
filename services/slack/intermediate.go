@@ -489,7 +489,7 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 			// bot message
 			case post.IsBotMessage():
 				if post.BotId == "" {
-					t.Logger.Warn("Unable to import the message as bot joining/leaving message is not supported")
+					t.Logger.Warn("Unable to import the message as bot ID is not present")
 					continue
 				}
 
