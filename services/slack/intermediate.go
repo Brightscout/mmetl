@@ -117,14 +117,28 @@ func (t *Transformer) TransformUsers(users []SlackUser) {
 
 	resultUsers := map[string]*IntermediateUser{}
 	for _, user := range users {
-		newUser := &IntermediateUser{
-			Id:        user.Id,
-			Username:  user.Username,
-			FirstName: user.Profile.FirstName,
-			LastName:  user.Profile.LastName,
-			Position:  user.Profile.Title,
-			Email:     user.Profile.Email,
-			Password:  model.NewId(),
+		var newUser *IntermediateUser
+
+		if user.IsBot {
+			newUser = &IntermediateUser{
+				Id:        user.Profile.BotID,
+				Username:  user.Username,
+				FirstName: user.Profile.FirstName,
+				LastName:  user.Profile.LastName,
+				Position:  user.Profile.Title,
+				Email:     user.Profile.Email,
+				Password:  model.NewId(),
+			}
+		} else {
+			newUser = &IntermediateUser{
+				Id:        user.Id,
+				Username:  user.Username,
+				FirstName: user.Profile.FirstName,
+				LastName:  user.Profile.LastName,
+				Position:  user.Profile.Title,
+				Email:     user.Profile.Email,
+				Password:  model.NewId(),
+			}
 		}
 
 		newUser.Sanitise(t.Logger)
@@ -474,8 +488,25 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 
 			// bot message
 			case post.IsBotMessage():
-				// log.Println("Slack Import: bot messages are not yet supported")
-				break
+				if post.BotId == "" {
+					t.Logger.Warn("Unable to import the message as bot joining/leaving message is not supported")
+					continue
+				}
+
+				author := t.Intermediate.UsersById[post.BotId]
+				if author == nil {
+					t.CreateIntermediateUser(post.BotId)
+					author = t.Intermediate.UsersById[post.BotId]
+				}
+
+				newPost := &IntermediatePost{
+					User:     author.Username,
+					Channel:  channel.Name,
+					Message:  post.Text,
+					CreateAt: SlackConvertTimeStamp(post.TimeStamp),
+				}
+
+				AddPostToThreads(post, newPost, threads, channel, timestamps)
 
 			// channel join/leave messages
 			case post.IsJoinLeaveMessage():
