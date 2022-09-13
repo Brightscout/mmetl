@@ -72,7 +72,7 @@ func (p *SlackPost) IsFileComment() bool {
 }
 
 func (p *SlackPost) IsBotMessage() bool {
-	return p.Type == "message" && p.SubType == "bot_message"
+	return p.Type == "message" && (p.SubType == "bot_message" || p.SubType == "tombstone")
 }
 
 func (p *SlackPost) IsJoinLeaveMessage() bool {

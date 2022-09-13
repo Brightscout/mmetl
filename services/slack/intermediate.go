@@ -489,8 +489,11 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 			// bot message
 			case post.IsBotMessage():
 				if post.BotId == "" {
-					t.Logger.Warn("Unable to import the message as bot ID is not present")
-					continue
+					if post.User == "" {
+						t.Logger.Warn("Unable to import the message as the user field is missing.")
+						continue
+					}
+					post.BotId = post.User
 				}
 
 				author := t.Intermediate.UsersById[post.BotId]
@@ -551,8 +554,25 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 
 			// me message
 			case post.IsMeMessage():
-				// log.Println("Slack Import: me messages are not yet supported")
-				break
+				if post.User == "" {
+					t.Logger.Warn("Unable to import the message as the user field is missing.")
+					continue
+				}
+
+				author := t.Intermediate.UsersById[post.User]
+				if author == nil {
+					t.CreateIntermediateUser(post.User)
+					author = t.Intermediate.UsersById[post.User]
+				}
+
+				newPost := &IntermediatePost{
+					User:     author.Username,
+					Channel:  channel.Name,
+					Message:  post.Text,
+					CreateAt: SlackConvertTimeStamp(post.TimeStamp),
+				}
+
+				AddPostToThreads(post, newPost, threads, channel, timestamps)
 
 			// change topic message
 			case post.IsChannelTopicMessage():
