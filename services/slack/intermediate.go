@@ -118,6 +118,7 @@ func (t *Transformer) TransformUsers(users []SlackUser) {
 	resultUsers := map[string]*IntermediateUser{}
 	for _, user := range users {
 		newUser := &IntermediateUser{
+			Id:        user.Id,
 			Username:  user.Username,
 			FirstName: user.Profile.FirstName,
 			LastName:  user.Profile.LastName,
@@ -128,8 +129,6 @@ func (t *Transformer) TransformUsers(users []SlackUser) {
 
 		if user.IsBot {
 			newUser.Id = user.Profile.BotID
-		} else {
-			newUser.Id = user.Id
 		}
 
 		newUser.Sanitise(t.Logger)
