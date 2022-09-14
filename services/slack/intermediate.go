@@ -117,28 +117,19 @@ func (t *Transformer) TransformUsers(users []SlackUser) {
 
 	resultUsers := map[string]*IntermediateUser{}
 	for _, user := range users {
-		var newUser *IntermediateUser
+		newUser := &IntermediateUser{
+			Username:  user.Username,
+			FirstName: user.Profile.FirstName,
+			LastName:  user.Profile.LastName,
+			Position:  user.Profile.Title,
+			Email:     user.Profile.Email,
+			Password:  model.NewId(),
+		}
 
 		if user.IsBot {
-			newUser = &IntermediateUser{
-				Id:        user.Profile.BotID,
-				Username:  user.Username,
-				FirstName: user.Profile.FirstName,
-				LastName:  user.Profile.LastName,
-				Position:  user.Profile.Title,
-				Email:     user.Profile.Email,
-				Password:  model.NewId(),
-			}
+			newUser.Id = user.Profile.BotID
 		} else {
-			newUser = &IntermediateUser{
-				Id:        user.Id,
-				Username:  user.Username,
-				FirstName: user.Profile.FirstName,
-				LastName:  user.Profile.LastName,
-				Position:  user.Profile.Title,
-				Email:     user.Profile.Email,
-				Password:  model.NewId(),
-			}
+			newUser.Id = user.Id
 		}
 
 		newUser.Sanitise(t.Logger)
