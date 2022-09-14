@@ -357,16 +357,16 @@ func addFileToPost(file *SlackFile, uploads map[string]*zip.File, post *Intermed
 	return nil
 }
 
-func (t *Transformer) CreateIntermediateUser(user string) {
+func (t *Transformer) CreateIntermediateUser(userID string) {
 	newUser := &IntermediateUser{
-		Id:        user,
-		Username:  strings.ToLower(user),
+		Id:        userID,
+		Username:  strings.ToLower(userID),
 		FirstName: "Deleted",
 		LastName:  "User",
-		Email:     fmt.Sprintf("%s@local", user),
+		Email:     fmt.Sprintf("%s@local", userID),
 		Password:  model.NewId(),
 	}
-	t.Intermediate.UsersById[user] = newUser
+	t.Intermediate.UsersById[userID] = newUser
 	t.Logger.Warnf("Created a new user because the original user was missing from the import files. user=%s", user)
 }
 
