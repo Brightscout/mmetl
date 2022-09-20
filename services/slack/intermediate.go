@@ -117,28 +117,18 @@ func (t *Transformer) TransformUsers(users []SlackUser) {
 
 	resultUsers := map[string]*IntermediateUser{}
 	for _, user := range users {
-		var newUser *IntermediateUser
+		newUser := &IntermediateUser{
+			Id:        user.Id,
+			Username:  user.Username,
+			FirstName: user.Profile.FirstName,
+			LastName:  user.Profile.LastName,
+			Position:  user.Profile.Title,
+			Email:     user.Profile.Email,
+			Password:  model.NewId(),
+		}
 
 		if user.IsBot {
-			newUser = &IntermediateUser{
-				Id:        user.Profile.BotID,
-				Username:  user.Username,
-				FirstName: user.Profile.FirstName,
-				LastName:  user.Profile.LastName,
-				Position:  user.Profile.Title,
-				Email:     user.Profile.Email,
-				Password:  model.NewId(),
-			}
-		} else {
-			newUser = &IntermediateUser{
-				Id:        user.Id,
-				Username:  user.Username,
-				FirstName: user.Profile.FirstName,
-				LastName:  user.Profile.LastName,
-				Position:  user.Profile.Title,
-				Email:     user.Profile.Email,
-				Password:  model.NewId(),
-			}
+			newUser.Id = user.Profile.BotID
 		}
 
 		newUser.Sanitise(t.Logger)
@@ -401,6 +391,34 @@ func (t *Transformer) CreateAndAddPostsToThreads(post SlackPost, threads map[str
 	AddPostToThreads(post, newPost, threads, channel, timestamps)
 }
 
+func (t *Transformer) AddFilesToPost(post *SlackPost, skipAttachments bool, slackExport *SlackExport, attachmentsDir string, newPost *IntermediatePost) {
+	if (post.File != nil || post.Files != nil) && !skipAttachments {
+		if post.File != nil {
+			err := addFileToPost(post.File, slackExport.Uploads, newPost, attachmentsDir)
+			if err != nil {
+				t.Logger.WithError(err).Error("Failed to add file to post")
+			}
+		} else if post.Files != nil {
+			for _, file := range post.Files {
+				if file.Name == "" {
+					t.Logger.Warnf("Not able to access the file %s as file access is denied so skipping", file.Id)
+					continue
+				}
+				err := addFileToPost(file, slackExport.Uploads, newPost, attachmentsDir)
+				if err != nil {
+					t.Logger.WithError(err).Error("Failed to add file to post")
+				}
+			}
+		}
+	}
+}
+
+func (t *Transformer) AddAttachmentsToPost(post *SlackPost, newPost *IntermediatePost) (model.StringInterface, []byte) {
+	props := model.StringInterface{"attachments": post.Attachments}
+	propsB, _ := json.Marshal(props)
+	return props, propsB
+}
+
 func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir string, skipAttachments, discardInvalidProps bool) error {
 	t.Logger.Info("Transforming posts")
 
@@ -441,30 +459,10 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 					Message:  post.Text,
 					CreateAt: SlackConvertTimeStamp(post.TimeStamp),
 				}
-				if (post.File != nil || post.Files != nil) && !skipAttachments {
-					if post.File != nil {
-						err := addFileToPost(post.File, slackExport.Uploads, newPost, attachmentsDir)
-						if err != nil {
-							t.Logger.WithError(err).Error("Failed to add file to post")
-						}
-					} else if post.Files != nil {
-						for _, file := range post.Files {
-							if file.Name == "" {
-								t.Logger.Warnf("Not able to access file %s as file access is denied so skipping", file.Id)
-								continue
-							}
-							err := addFileToPost(file, slackExport.Uploads, newPost, attachmentsDir)
-							if err != nil {
-								t.Logger.WithError(err).Error("Failed to add file to post")
-							}
-						}
-					}
-				}
+				t.AddFilesToPost(&post, skipAttachments, slackExport, attachmentsDir, newPost)
 
 				if len(post.Attachments) > 0 {
-					props := model.StringInterface{"attachments": post.Attachments}
-					propsB, _ := json.Marshal(props)
-
+					props, propsB := t.AddAttachmentsToPost(&post, newPost)
 					if utf8.RuneCountInString(string(propsB)) <= model.PostPropsMaxRunes {
 						newPost.Props = props
 					} else {
@@ -526,38 +524,18 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 					CreateAt: SlackConvertTimeStamp(post.TimeStamp),
 				}
 
-				if (post.File != nil || post.Files != nil) && !skipAttachments {
-					if post.File != nil {
-						err := addFileToPost(post.File, slackExport.Uploads, newPost, attachmentsDir)
-						if err != nil {
-							t.Logger.WithError(err).Error("Failed to add file to post")
-						}
-					} else if post.Files != nil {
-						for _, file := range post.Files {
-							if file.Name == "" {
-								t.Logger.Warnf("Not able to access file %s as file access is denied so skipping", file.Id)
-								continue
-							}
-							err := addFileToPost(file, slackExport.Uploads, newPost, attachmentsDir)
-							if err != nil {
-								t.Logger.WithError(err).Error("Failed to add file to post")
-							}
-						}
-					}
-				}
+				t.AddFilesToPost(&post, skipAttachments, slackExport, attachmentsDir, newPost)
 
 				if len(post.Attachments) > 0 {
-					props := model.StringInterface{"attachments": post.Attachments}
-					propsB, _ := json.Marshal(props)
-
+					props, propsB := t.AddAttachmentsToPost(&post, newPost)
 					if utf8.RuneCountInString(string(propsB)) <= model.PostPropsMaxRunes {
 						newPost.Props = props
 					} else {
 						if discardInvalidProps {
-							t.Logger.Warn("Unable import post as props exceed the maximum character count. Skipping as --discard-invalid-props is enabled.")
+							t.Logger.Warn("Unable to import the post as props exceed the maximum character count. Skipping as --discard-invalid-props is enabled.")
 							continue
 						} else {
-							t.Logger.Warn("Unable to add props to post as they exceed the maximum character count.")
+							t.Logger.Warn("Unable to add the props to post as they exceed the maximum character count.")
 						}
 					}
 				}
