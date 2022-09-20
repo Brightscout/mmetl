@@ -375,22 +375,21 @@ func (t *Transformer) CreateIntermediateUser(user string) {
 }
 
 func (t *Transformer) AddFilesToPost(post *SlackPost, skipAttachments bool, slackExport *SlackExport, attachmentsDir string, newPost *IntermediatePost) {
-	if (post.File != nil || post.Files != nil) && !skipAttachments {
-		if post.File != nil {
-			err := addFileToPost(post.File, slackExport.Uploads, newPost, attachmentsDir)
-			if err != nil {
-				t.Logger.WithError(err).Error("Failed to add file to post")
+	if skipAttachments || (post.File == nil && post.Files == nil) {
+		return
+	}
+	if post.File != nil {
+		if err := addFileToPost(post.File, slackExport.Uploads, newPost, attachmentsDir); err != nil {
+			t.Logger.WithError(err).Error("Failed to add file to post")
+		}
+	} else if post.Files != nil {
+		for _, file := range post.Files {
+			if file.Name == "" {
+				t.Logger.Warnf("Not able to access the file %s as file access is denied so skipping", file.Id)
+				continue
 			}
-		} else if post.Files != nil {
-			for _, file := range post.Files {
-				if file.Name == "" {
-					t.Logger.Warnf("Not able to access the file %s as file access is denied so skipping", file.Id)
-					continue
-				}
-				err := addFileToPost(file, slackExport.Uploads, newPost, attachmentsDir)
-				if err != nil {
-					t.Logger.WithError(err).Error("Failed to add file to post")
-				}
+			if err := addFileToPost(file, slackExport.Uploads, newPost, attachmentsDir); err != nil {
+				t.Logger.WithError(err).Error("Failed to add file to post")
 			}
 		}
 	}
@@ -398,8 +397,8 @@ func (t *Transformer) AddFilesToPost(post *SlackPost, skipAttachments bool, slac
 
 func (t *Transformer) AddAttachmentsToPost(post *SlackPost, newPost *IntermediatePost) (model.StringInterface, []byte) {
 	props := model.StringInterface{"attachments": post.Attachments}
-	propsB, _ := json.Marshal(props)
-	return props, propsB
+	propsByteArray, _ := json.Marshal(props)
+	return props, propsByteArray
 }
 
 func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir string, skipAttachments, discardInvalidProps bool) error {
