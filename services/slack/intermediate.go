@@ -374,6 +374,23 @@ func (t *Transformer) CreateIntermediateUser(user string) {
 	t.Logger.Warnf("Created a new user because the original user was missing from the import files. user=%s", user)
 }
 
+func (t *Transformer) CreateAndAddPostToThreads(post SlackPost, threads map[string]*IntermediatePost, timestamps map[int64]bool, channel *IntermediateChannel) {
+	author := t.Intermediate.UsersById[post.User]
+	if author == nil {
+		t.CreateIntermediateUser(post.User)
+		author = t.Intermediate.UsersById[post.User]
+	}
+
+	newPost := &IntermediatePost{
+		User:     author.Username,
+		Channel:  channel.Name,
+		Message:  post.Text,
+		CreateAt: SlackConvertTimeStamp(post.TimeStamp),
+	}
+
+	AddPostToThreads(post, newPost, threads, channel, timestamps)
+}
+
 func (t *Transformer) AddFilesToPost(post *SlackPost, skipAttachments bool, slackExport *SlackExport, attachmentsDir string, newPost *IntermediatePost) {
 	if skipAttachments || (post.File == nil && post.Files == nil) {
 		return
@@ -526,8 +543,12 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 
 			// channel join/leave messages
 			case post.IsJoinLeaveMessage():
-				// log.Println("Slack Import: Join/Leave messages are not yet supported")
-				break
+				if post.User == "" {
+					t.Logger.Warn("Unable to import the message as the user field is missing.")
+					continue
+				}
+
+				t.CreateAndAddPostToThreads(post, threads, timestamps, channel)
 
 			// me message
 			case post.IsMeMessage():
@@ -535,21 +556,7 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 					t.Logger.Warn("Unable to import the message as the user field is missing.")
 					continue
 				}
-
-				author := t.Intermediate.UsersById[post.User]
-				if author == nil {
-					t.CreateIntermediateUser(post.User)
-					author = t.Intermediate.UsersById[post.User]
-				}
-
-				newPost := &IntermediatePost{
-					User:     author.Username,
-					Channel:  channel.Name,
-					Message:  post.Text,
-					CreateAt: SlackConvertTimeStamp(post.TimeStamp),
-				}
-
-				AddPostToThreads(post, newPost, threads, channel, timestamps)
+				t.CreateAndAddPostToThreads(post, threads, timestamps, channel)
 
 			// change topic message
 			case post.IsChannelTopicMessage():
@@ -557,21 +564,7 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 					t.Logger.Warn("Unable to import the message as the user field is missing.")
 					continue
 				}
-				author := t.Intermediate.UsersById[post.User]
-				if author == nil {
-					t.CreateIntermediateUser(post.User)
-					author = t.Intermediate.UsersById[post.User]
-				}
-
-				newPost := &IntermediatePost{
-					User:     author.Username,
-					Channel:  channel.Name,
-					Message:  post.Text,
-					CreateAt: SlackConvertTimeStamp(post.TimeStamp),
-					// Type:     model.POST_HEADER_CHANGE,
-				}
-
-				AddPostToThreads(post, newPost, threads, channel, timestamps)
+				t.CreateAndAddPostToThreads(post, threads, timestamps, channel)
 
 			// change channel purpose message
 			case post.IsChannelPurposeMessage():
@@ -579,21 +572,7 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 					t.Logger.Warn("Unable to import the message as the user field is missing.")
 					continue
 				}
-				author := t.Intermediate.UsersById[post.User]
-				if author == nil {
-					t.CreateIntermediateUser(post.User)
-					author = t.Intermediate.UsersById[post.User]
-				}
-
-				newPost := &IntermediatePost{
-					User:     author.Username,
-					Channel:  channel.Name,
-					Message:  post.Text,
-					CreateAt: SlackConvertTimeStamp(post.TimeStamp),
-					// Type:     model.POST_HEADER_CHANGE,
-				}
-
-				AddPostToThreads(post, newPost, threads, channel, timestamps)
+				t.CreateAndAddPostToThreads(post, threads, timestamps, channel)
 
 			// change channel name message
 			case post.IsChannelNameMessage():
@@ -601,21 +580,7 @@ func (t *Transformer) TransformPosts(slackExport *SlackExport, attachmentsDir st
 					t.Logger.Warn("Slack Import: Unable to import the message as the user field is missing.")
 					continue
 				}
-				author := t.Intermediate.UsersById[post.User]
-				if author == nil {
-					t.CreateIntermediateUser(post.User)
-					author = t.Intermediate.UsersById[post.User]
-				}
-
-				newPost := &IntermediatePost{
-					User:     author.Username,
-					Channel:  channel.Name,
-					Message:  post.Text,
-					CreateAt: SlackConvertTimeStamp(post.TimeStamp),
-					// Type:     model.POST_DISPLAYNAME_CHANGE,
-				}
-
-				AddPostToThreads(post, newPost, threads, channel, timestamps)
+				t.CreateAndAddPostToThreads(post, threads, timestamps, channel)
 
 			default:
 				t.Logger.Warnf("Unable to import the message as its type is not supported. post_type=%s, post_subtype=%s", post.Type, post.SubType)
